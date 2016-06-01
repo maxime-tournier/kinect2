@@ -1,6 +1,8 @@
 import ctypes 
-
 from ctypes import CDLL
+
+from contextlib import contextmanager
+
 
 dll = CDLL('kinect2')
 
@@ -12,8 +14,6 @@ dll.release.restype = None
 
 dll.update.argtypes = (ctypes.c_ulong, )
 dll.update.restype = ctypes.c_void_p
-
-from contextlib import contextmanager
 
 class Vec3(ctypes.Structure):
 
@@ -156,24 +156,6 @@ joint_type.thumb_right = 24
 joint_type.count = 25
 
             
-if __name__ == '__main__':
 
-    import cv2
-    import numpy as np
-    import sys
-
-    flags = source_type.color + source_type.body
-    for f in frames(flags):
-
-        img = f.get('color', None)
-        if img is not None:
-            cv2.imshow('image', img)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                 sys.exit(0)
-
-        body = f.get('body', None)
-        if body is not None:
-            print(body)
-            sys.stdout.flush()
 
         
