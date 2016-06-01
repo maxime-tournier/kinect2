@@ -1,4 +1,5 @@
-// dllmain.cpp : Defines the entry point for the DLL application.
+// LICENSE: MIT
+// AUTHOR: http://github.com/maxime-tournier
 
 #define EXPORT  __declspec( dllexport ) 
 
@@ -9,7 +10,83 @@
 #include <iostream>
 #include <vector>
 
-// helpers
+
+// forward
+class multi_frame_reader;
+
+// c api data structures
+namespace capi {
+
+	struct vec3 { float x, y, z; };
+
+	struct body {
+		unsigned index;
+
+		// TODO hand status, etc
+
+		// joint positions
+		vec3 joint[JointType_Count];
+
+		// callback is given an array of bodies
+		using callback = void(*)(body* data, unsigned size);
+
+	};
+
+
+	struct color {
+		int width, height;
+		RGBQUAD* data;
+
+		// callback is given a color image
+		using callback = void(*)(color img);
+	};
+
+	struct instance {
+
+		std::shared_ptr<multi_frame_reader> reader;
+
+		body::callback body_cb = nullptr;
+		color::callback color_cb = nullptr;
+
+		std::vector<RGBQUAD> buffer;
+	};
+
+	using handle = instance*;
+}
+
+
+// c api 
+extern "C" {
+
+	
+	// initialize library instance, flags is built from FrameSourceTypes and is
+	// passed to IKinectSensor::OpenMultiSourceFrameReader
+	// see https://msdn.microsoft.com/en-us/library/windowspreview.kinect.framesourcetypes.aspx
+	// warning: only body / color frames are supported
+	EXPORT capi::handle init(DWORD flags);
+
+	// finalize library instance
+	EXPORT void release(capi::handle h);
+
+	// register callback for body frames
+	EXPORT void body_callback(capi::handle h, capi::body::callback cb) {
+		h->body_cb = cb;
+	}
+
+	// register callback for color frames
+	EXPORT void color_callback(capi::handle h, capi::color::callback cb) {
+		h->color_cb = cb;
+	}
+
+	// wait for incoming frame and call registered callbacks
+	EXPORT void update(capi::handle h);
+
+}
+
+
+
+
+// raii for realeasable types
 template<class T>
 class wrapped {
 protected:
@@ -33,7 +110,6 @@ public:
 
 	~wrapped() {
 		if (ptr) {
-			// std::clog << "release " << ptr << std::endl;
 			ptr->Release();
 		}
 	}
@@ -67,8 +143,6 @@ public:
 	}
 
 };
-
-
 
 
 
@@ -214,57 +288,6 @@ public:
 
 // TODO coordinate mapper
 
-namespace capi {
-
-	struct vec3 { float x, y, z; };
-	// struct bgra { char b, g, r, a;  };
-
-	struct body {
-		unsigned index;
-
-		// TODO more
-		vec3 joint[JointType_Count];
-
-		using callback = void(*)(body* data, unsigned size);
-	};
-
-	struct color {
-		int width, height;
-		RGBQUAD* data;
-
-		using callback = void(*)(color img);
-	};
-
-	struct instance {
-
-		std::shared_ptr<multi_frame_reader> reader;
-
-		body::callback body_cb = nullptr;
-		color::callback color_cb = nullptr;
-
-		std::vector<RGBQUAD> buffer;
-	};
-
-}
-
-
-
-extern "C" {
-
-	EXPORT capi::instance* init(DWORD flags);
-	EXPORT void release(capi::instance*);
-
-	EXPORT void body_callback(capi::instance* instance, capi::body::callback cb) {
-		instance->body_cb = cb;
-	}
-
-	EXPORT void color_callback(capi::instance* instance, capi::color::callback cb) {
-		instance->color_cb = cb;
-	}
-
-	EXPORT void update(capi::instance*);
-
-}
 
 capi::instance* init(DWORD flags) {
 	try{
